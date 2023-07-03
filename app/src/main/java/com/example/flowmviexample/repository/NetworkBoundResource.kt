@@ -14,27 +14,32 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import retrofit2.Response
 
 
 abstract class NetworkBoundResource<ResponseObject, ViewStateType> {
 
     protected val result = MutableStateFlow<DataState<ViewStateType>>(DataState.loading(true))
+    init {
 
-    suspend fun handleNetworkCall(response: GenericApiResponse<ResponseObject>) {
-        when (response) {
-            is ApiSuccessResponse -> {
-                handleApiSuccessResponse(response)
+
+        GlobalScope.launch(IO){
+            val apiResponse = createCall()
+            apiResponse.collect{
+
+            handleNetworkCall(it)
             }
-            is ApiErrorResponse -> {
-                println("DEBUG: NetworkBoundResource: ${response.errorMessage}")
-                onReturnError(response.errorMessage)
-            }
-            is ApiEmptyResponse -> {
-                println("DEBUG: NetworkBoundResource: Request returned NOTHING (HTTP 204)")
-                onReturnError("HTTP 204. Returned NOTHING.")
-            }
+
+        }
+    }
+    suspend fun handleNetworkCall(response: Response<ResponseObject>) {
+        when (response.code()) {
+            200 ->  handleApiSuccessResponse(response)
+            400 -> onReturnError(response.message())
+            500 -> onReturnError("HTTP 204. Returned NOTHING.")
         }
     }
 
@@ -42,9 +47,9 @@ abstract class NetworkBoundResource<ResponseObject, ViewStateType> {
         result.value = DataState.error(message)
     }
 
-    abstract fun handleApiSuccessResponse(response: ApiSuccessResponse<ResponseObject>)
+    abstract fun handleApiSuccessResponse(response: Response<ResponseObject>)
 
-    abstract suspend fun createCall(): Flow<GenericApiResponse<ResponseObject>>
+    abstract suspend fun createCall(): Flow<Response<ResponseObject>>
 
     fun asFlow(): Flow<DataState<ViewStateType>> = result
 }
