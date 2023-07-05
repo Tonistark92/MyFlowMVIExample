@@ -15,9 +15,12 @@ import com.example.flowmviexample.util.ApiErrorResponse
 import com.example.flowmviexample.util.ApiSuccessResponse
 import com.example.flowmviexample.util.DataState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
@@ -29,49 +32,49 @@ class MainViewModel : ViewModel() {
         MutableStateFlow(MainStateEvent.None)
     private val _viewState: MutableStateFlow<MainViewState> = MutableStateFlow(MainViewState())
 
-    val viewState: MutableStateFlow<MainViewState>
+    val viewState: StateFlow<MainViewState>
         get() = _viewState
 
-
-    val dataState: Flow<DataState<MainViewState>> = _stateEvent.flatMapLatest { stateEvent ->
-        handleStateEvent(stateEvent)
-    }
-
+    private val _dataState: MutableStateFlow<DataState<MainViewState>> =
+        MutableStateFlow(DataState())
+    val dataState: StateFlow<DataState<MainViewState>> = _dataState
+//    val dataState: Flow<DataState<MainViewState>> = _stateEvent.flatMapLatest { stateEvent ->
+//        handleStateEvent(stateEvent)
+//    }
     init {
-//        viewModelScope.launch {
-//            Log.d("TAG", "in view-model ${MyRetrofitBuilder.apiService.getBlogPosts().toString()}")
-//            MyRetrofitBuilder.apiService.getBlogPosts().collect{
-//                Log.d("TAG", "in view-model ${it.body().toString()}")
-//
-//            }
-            viewModelScope.launch {
-
-            Repository.getBlogPosts().collect{
-                Log.d("TAG", "in view-model ${it.data.toString()}")
+        viewModelScope.launch {
+            _stateEvent.collectLatest { stateEvent ->
+                handleStateEvent(stateEvent)
             }
-
-            }
-
         }
     }
 
-    fun handleStateEvent(stateEvent: MainStateEvent): Flow<DataState<MainViewState>> {
-        println("DEBUG: New StateEvent detected: $stateEvent")
+    fun setStateEvent(event: MainStateEvent) {
+        _stateEvent.value = event
+    }
+
+    private suspend fun handleStateEvent(stateEvent: MainStateEvent) {
         when (stateEvent) {
-
             is MainStateEvent.GetBlogPostsEvent -> {
-//                Log.d("TAG",Repository.getBlogPosts().toString())
-//                return Repository.getBlogPosts()
+                _dataState.value = DataState.loading(isLoading = true)
+                try {
+                    delay(1000L)
+                    val response = Repository.getBlogPosts()
+                    response.collect { dataState ->
+                        _viewState.value = _viewState.value.copy(blogPosts = dataState.data?.blogPosts)
+                        _dataState.value = DataState.data(data = _viewState.value)
+                    }
+                    _dataState.value = DataState.loading(isLoading = false)
+
+                } catch (e: Exception) {
+                    _dataState.value = DataState.error(message = "Error fetching blog posts")
+                }
             }
 
-            is MainStateEvent.GetUserEvent -> {
-//                return Repository.getUser(stateEvent.userId)
-            }
-
-            is MainStateEvent.None -> {
-                return flow { }
-            }
+            is MainStateEvent.GetUserEvent -> {}
+            is MainStateEvent.None -> {}
         }
-        return TODO("Provide the return value")
     }
+}
+
 

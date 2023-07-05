@@ -8,7 +8,6 @@ import com.example.flowmviexample.model.Post
 data class MainViewState(
 
     var blogPosts: MyDameResponse? = null,
-
     var user: User? = null
 
 )
