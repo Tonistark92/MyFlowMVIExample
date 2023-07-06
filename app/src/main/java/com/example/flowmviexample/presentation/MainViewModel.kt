@@ -62,12 +62,12 @@ class MainViewModel : ViewModel() {
                     val response = Repository.getBlogPosts()
                     response.collect { dataState ->
                         _viewState.value = _viewState.value.copy(blogPosts = dataState.data?.blogPosts)
-                        _dataState.value = DataState.data(data = _viewState.value)
+                        _dataState.value = dataState
                     }
                     _dataState.value = DataState.loading(isLoading = false)
 
                 } catch (e: Exception) {
-                    _dataState.value = DataState.error(message = "Error fetching blog posts")
+                    _dataState.value = DataState.error(message = "Error fetching blog posts from view model")
                 }
             }
 
